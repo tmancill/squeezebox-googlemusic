@@ -58,6 +58,7 @@ sub handler {
     if ($params->{'saveSettings'} && $params->{'username'} && $params->{'password'} &&
         (($params->{'username'} ne $prefs->get('username')) || 
          (encode_base64($params->{'password'}, '') ne $prefs->get('password')))) {
+
         $prefs->set('username', $params->{'username'});
         $prefs->set('password', encode_base64($params->{'password'}, ''));
 
@@ -69,9 +70,7 @@ sub handler {
         # be able to show the settings page correctly, so that the
         # user is able to disable SSL verification.
         eval {
-            $googleapi->login($prefs->get('username'),
-                decode_base64($prefs->get('password')),
-                            $prefs->get('device_id'));
+            $googleapi->oauth_login($prefs->get('device_id'));
         };
         if ($@) {
             $log->error("Not able to login to Google Play Music: $@");
