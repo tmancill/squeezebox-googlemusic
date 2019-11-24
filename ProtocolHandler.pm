@@ -6,7 +6,9 @@ use warnings;
 # On LMS 7.9.0 and greater, https support is handled by the new
 # Slim::Player::Protocols::HTTPS library, which isn't available
 # on older versions
-use if (Slim::Utils::Versions->compareVersions($::VERSION, '7.9.0')) >= 0, base => qw(Slim::Player::Protocols::HTTPS);
+#
+# But use HTTP since we're using gmusicproxy
+use if (Slim::Utils::Versions->compareVersions($::VERSION, '7.9.0')) >= 0, base => qw(Slim::Player::Protocols::HTTP);
 use if (Slim::Utils::Versions->compareVersions($::VERSION, '7.9.0')) < 0, base => qw(Slim::Player::Protocols::HTTP);
 
 use Scalar::Util qw(blessed);
@@ -38,10 +40,16 @@ sub new {
     my $streamUrl = $song->streamUrl() || return;
     my $track     = $song->pluginData('info') || {};
 
+    # rewrite URL for local GMusicProxy
+    my $url = $song->track->url;
+    my ($id) = $url =~ m{^googlemusic:track:(.*)$}x;
+    my $gmusicProxyUrl = 'http://localhost:9999/get_song?id=' . $id;
+
     main::DEBUGLOG && $log->debug( 'Remote streaming Google Music track: ' . $streamUrl );
+    main::DEBUGLOG && $log->debug( 'Via: ' . $gmusicProxyUrl );
 
     my $sock = $class->SUPER::new( {
-        url     => $streamUrl,
+        url     => $gmusicProxyUrl,
         song    => $song,
         client  => $client,
     } ) || return;
@@ -137,9 +145,11 @@ sub getNextTrack {
 sub canDirectStreamSong {
     my ( $class, $client, $song ) = @_;
 
-    # We need to check with the base class (HTTP) to see if we
-    # are synced or if the user has set mp3StreamingMethod
-    return $class->SUPER::canDirectStream( $client, $song->streamUrl(), $class->getFormatForURL($song->track->url()) );
+    my $url = $song->track->url();
+    my ($id) = $url =~ m{^googlemusic:track:(.*)$}x;
+    my $gmusicProxyUrl = 'http://localhost:9999/get_song?id=' . $id;
+
+    return $class->SUPER::canDirectStream( $client, $gmusicProxyUrl, $class->getFormatForURL($song->track->url()) );
 }
 
 sub getMetadataFor {
@@ -159,7 +169,6 @@ sub getMetadataFor {
         rating   => $track->{'rating'},
     };
 }
-
 
 1;
 
